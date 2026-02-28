@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Serverless Bedrock POC Asynchronous LLM invocation using API Gateway,
+  Step Functions, Bedrock, and DynamoDB.
+
+  '
+Resources:
+  ResponseTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: JobId
+        Type: String
+  BedrockOrchestrator:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: ../../statemachine/workflow.asl.json
+      DefinitionSubstitutions:
+        Table_Name:
+          Ref: ResponseTable
+        Model_Arn: arn:aws:bedrock:us-east-1:258574424891:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0
+      Policies:
+      - DynamoDBWritePolicy:
+          TableName:
+            Ref: ResponseTable
+      - Statement:
+        - Effect: Allow
+          Action:
+          - bedrock:InvokeModel
+          Resource:
+          - arn:aws:bedrock:us-east-1:258574424891:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0
+          - arn:aws:bedrock:*::foundation-model/*
+      Events:
+        ApiTrigger:
+          Type: Api
+          Properties:
+            Path: /invoke
+            Method: post
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL for POST /invoke
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/invoke
+  TableName:
+    Description: DynamoDB Table Name
+    Value:
+      Ref: ResponseTable

@@ -1,0 +1,51 @@
+{
+  "Comment": "Asynchronous Bedrock Invocation Workflow",
+  "StartAt": "InvokeBedrockModel",
+  "States": {
+    "InvokeBedrockModel": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "${Model_Arn}",
+        "ContentType": "application/json",
+        "Accept": "application/json",
+        "Body": {
+          "anthropic_version": "bedrock-2023-05-31",
+          "max_tokens": 1000,
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text.$": "$.prompt"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "ResultPath": "$.BedrockResult",
+      "Next": "SaveToDynamoDB"
+    },
+    "SaveToDynamoDB": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "${Table_Name}",
+        "Item": {
+          "JobId": {
+            "S.$": "$.jobId"
+          },
+          "Prompt": {
+            "S.$": "$.prompt"
+          },
+          "Response": {
+            "S.$": "$.BedrockResult.Body.content[0].text"
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}
